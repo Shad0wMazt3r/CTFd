@@ -11,9 +11,9 @@ from CTFd.utils.decorators.visibility import (
     check_account_visibility,
     check_score_visibility,
 )
-from CTFd.utils.modes import TEAMS_MODE, generate_account_url, get_mode_as_word
+from CTFd.utils.modes import TEAMS_MODE, HYBRID_MODE, generate_account_url, get_mode_as_word
 from CTFd.utils.scoreboard import get_scoreboard_detail
-from CTFd.utils.scores import get_standings, get_user_standings
+from CTFd.utils.scores import get_standings, get_user_standings, get_hybrid_individual_standings, get_hybrid_team_standings
 
 scoreboard_namespace = Namespace(
     "scoreboard", description="Endpoint to retrieve scores"
@@ -26,9 +26,54 @@ class ScoreboardList(Resource):
     @check_score_visibility
     @cache.cached(timeout=60, key_prefix=make_cache_key)
     def get(self):
+        mode = get_config("user_mode")
+
+        # Handle hybrid mode differently
+        if mode == HYBRID_MODE:
+            individual_standings = get_hybrid_individual_standings()
+            team_standings = get_hybrid_team_standings()
+
+            # Format individual standings
+            individual_response = []
+            for i, x in enumerate(individual_standings):
+                individual_response.append({
+                    "pos": i + 1,
+                    "account_id": x.user_id,
+                    "account_url": generate_account_url(account_id=x.user_id),
+                    "account_type": "user",
+                    "oauth_id": x.oauth_id,
+                    "name": x.name,
+                    "score": int(x.score),
+                    "bracket_id": x.bracket_id,
+                    "bracket_name": x.bracket_name,
+                })
+
+            # Format team standings
+            team_response = []
+            for i, x in enumerate(team_standings):
+                team_response.append({
+                    "pos": i + 1,
+                    "account_id": x.team_id,
+                    "account_url": generate_account_url(account_id=x.team_id),
+                    "account_type": "team",
+                    "oauth_id": x.oauth_id,
+                    "name": x.name,
+                    "score": int(x.score),
+                    "bracket_id": x.bracket_id,
+                    "bracket_name": x.bracket_name,
+                })
+
+            return {
+                "success": True,
+                "data": {
+                    "individuals": individual_response,
+                    "teams": team_response
+                }
+            }
+
+        # Handle standard modes (users/teams)
         standings = get_standings()
         response = []
-        mode = get_config("user_mode")
         account_type = get_mode_as_word()
 
         if mode == TEAMS_MODE:
@@ -96,4 +141,54 @@ class ScoreboardDetail(Resource):
         count = max(1, min(count, 50))
         bracket_id = request.args.get("bracket_id")
         response = get_scoreboard_detail(count=count, bracket_id=bracket_id)
+        return {"success": True, "data": response}
+
+
+@scoreboard_namespace.route("/individuals")
+class HybridIndividualScoreboard(Resource):
+    @check_account_visibility
+    @check_score_visibility
+    @cache.cached(timeout=60, key_prefix=make_cache_key)
+    def get(self):
+        standings = get_hybrid_individual_standings()
+        response = []
+
+        for i, x in enumerate(standings):
+            response.append({
+                "pos": i + 1,
+                "account_id": x.user_id,
+                "account_url": generate_account_url(account_id=x.user_id),
+                "account_type": "user",
+                "oauth_id": x.oauth_id,
+                "name": x.name,
+                "score": int(x.score),
+                "bracket_id": x.bracket_id,
+                "bracket_name": x.bracket_name,
+            })
+
+        return {"success": True, "data": response}
+
+
+@scoreboard_namespace.route("/teams")
+class HybridTeamScoreboard(Resource):
+    @check_account_visibility
+    @check_score_visibility
+    @cache.cached(timeout=60, key_prefix=make_cache_key)
+    def get(self):
+        standings = get_hybrid_team_standings()
+        response = []
+
+        for i, x in enumerate(standings):
+            response.append({
+                "pos": i + 1,
+                "account_id": x.team_id,
+                "account_url": generate_account_url(account_id=x.team_id),
+                "account_type": "team",
+                "oauth_id": x.oauth_id,
+                "name": x.name,
+                "score": int(x.score),
+                "bracket_id": x.bracket_id,
+                "bracket_name": x.bracket_name,
+            })
+
         return {"success": True, "data": response}

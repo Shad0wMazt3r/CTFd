@@ -33,14 +33,63 @@ Alpine.data("ScoreboardDetail", () => ({
   },
 }));
 
+// Helper functions for hybrid mode scoreboard API calls
+const getHybridIndividualScoreboard = async () => {
+  try {
+    const response = await CTFd.fetch("/api/v1/scoreboard/individuals", {
+      method: "GET",
+      credentials: "same-origin",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+    });
+    const result = await response.json();
+    return result.success ? result.data : [];
+  } catch (error) {
+    console.error("Error fetching individual scoreboard:", error);
+    return [];
+  }
+};
+
+const getHybridTeamScoreboard = async () => {
+  try {
+    const response = await CTFd.fetch("/api/v1/scoreboard/teams", {
+      method: "GET",
+      credentials: "same-origin",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+    });
+    const result = await response.json();
+    return result.success ? result.data : [];
+  } catch (error) {
+    console.error("Error fetching team scoreboard:", error);
+    return [];
+  }
+};
+
 Alpine.data("ScoreboardList", () => ({
   standings: [],
+  individualStandings: [],
+  teamStandings: [],
   brackets: [],
   activeBracket: null,
+  activeTab: 'individuals',
+  isHybridMode: CTFd.config.userMode === 'hybrid',
 
   async update() {
     this.brackets = await CTFd.pages.scoreboard.getBrackets(CTFd.config.userMode);
-    this.standings = await CTFd.pages.scoreboard.getScoreboard();
+
+    if (this.isHybridMode) {
+      // In hybrid mode, fetch both individual and team standings
+      this.individualStandings = await getHybridIndividualScoreboard();
+      this.teamStandings = await getHybridTeamScoreboard();
+    } else {
+      // In standard mode, fetch regular standings
+      this.standings = await CTFd.pages.scoreboard.getScoreboard();
+    }
   },
 
   async init() {

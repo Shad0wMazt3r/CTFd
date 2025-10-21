@@ -23,7 +23,7 @@ from CTFd.schemas.submissions import SubmissionSchema
 from CTFd.schemas.teams import TeamSchema
 from CTFd.utils import get_config
 from CTFd.utils.decorators import admins_only, authed_only, require_team
-from CTFd.utils.decorators.modes import require_team_mode
+from CTFd.utils.decorators.modes import require_team_mode, allow_hybrid_mode
 from CTFd.utils.decorators.visibility import (
     check_account_visibility,
     check_score_visibility,
@@ -56,7 +56,7 @@ teams_namespace.schema_model(
 
 @teams_namespace.route("")
 class TeamList(Resource):
-    method_decorators = [require_team_mode]
+    method_decorators = [allow_hybrid_mode]
 
     @check_account_visibility
     @teams_namespace.doc(
@@ -177,7 +177,7 @@ class TeamList(Resource):
 @teams_namespace.route("/<int:team_id>")
 @teams_namespace.param("team_id", "Team ID")
 class TeamPublic(Resource):
-    method_decorators = [require_team_mode]
+    method_decorators = [allow_hybrid_mode]
 
     @check_account_visibility
     @teams_namespace.doc(
@@ -252,6 +252,12 @@ class TeamPublic(Resource):
 
         for member in team.members:
             member.team_id = None
+            
+            # In hybrid mode, update user_type when leaving team
+            from CTFd.utils import get_config
+            if get_config("user_mode") == "hybrid":
+                member.user_type = "individual"
+            
             clear_user_session(user_id=member.id)
 
         db.session.delete(team)
@@ -269,7 +275,7 @@ class TeamPublic(Resource):
 @teams_namespace.route("/me")
 @teams_namespace.param("team_id", "Current Team")
 class TeamPrivate(Resource):
-    method_decorators = [require_team_mode]
+    method_decorators = [allow_hybrid_mode]
 
     @authed_only
     @require_team
@@ -388,6 +394,12 @@ class TeamPrivate(Resource):
 
         for member in team.members:
             member.team_id = None
+            
+            # In hybrid mode, update user_type when leaving team
+            from CTFd.utils import get_config
+            if get_config("user_mode") == "hybrid":
+                member.user_type = "individual"
+            
             clear_user_session(user_id=member.id)
 
         db.session.delete(team)
@@ -404,7 +416,7 @@ class TeamPrivate(Resource):
 
 @teams_namespace.route("/me/members")
 class TeamPrivateMembers(Resource):
-    method_decorators = [require_team_mode]
+    method_decorators = [allow_hybrid_mode]
 
     @authed_only
     @require_team
@@ -427,7 +439,7 @@ class TeamPrivateMembers(Resource):
 @teams_namespace.route("/<team_id>/members")
 @teams_namespace.param("team_id", "Team ID")
 class TeamMembers(Resource):
-    method_decorators = [require_team_mode]
+    method_decorators = [allow_hybrid_mode]
 
     @admins_only
     def get(self, team_id):
@@ -490,6 +502,11 @@ class TeamMembers(Resource):
 
         if user.team_id == team.id:
             team.members.remove(user)
+            
+            # In hybrid mode, update user_type when leaving team  
+            from CTFd.utils import get_config
+            if get_config("user_mode") == "hybrid":
+                user.user_type = "individual"
 
             # Remove information that links the user to the team
             Submissions.query.filter_by(user_id=user.id).delete()
@@ -517,7 +534,7 @@ class TeamMembers(Resource):
 
 @teams_namespace.route("/me/solves")
 class TeamPrivateSolves(Resource):
-    method_decorators = [require_team_mode]
+    method_decorators = [allow_hybrid_mode]
 
     @authed_only
     @require_team
@@ -538,7 +555,7 @@ class TeamPrivateSolves(Resource):
 
 @teams_namespace.route("/me/fails")
 class TeamPrivateFails(Resource):
-    method_decorators = [require_team_mode]
+    method_decorators = [allow_hybrid_mode]
 
     @authed_only
     @require_team
@@ -568,7 +585,7 @@ class TeamPrivateFails(Resource):
 
 @teams_namespace.route("/me/awards")
 class TeamPrivateAwards(Resource):
-    method_decorators = [require_team_mode]
+    method_decorators = [allow_hybrid_mode]
 
     @authed_only
     @require_team
@@ -589,7 +606,7 @@ class TeamPrivateAwards(Resource):
 @teams_namespace.route("/<team_id>/solves")
 @teams_namespace.param("team_id", "Team ID")
 class TeamPublicSolves(Resource):
-    method_decorators = [require_team_mode]
+    method_decorators = [allow_hybrid_mode]
 
     @check_account_visibility
     @check_score_visibility
@@ -614,7 +631,7 @@ class TeamPublicSolves(Resource):
 @teams_namespace.route("/<team_id>/fails")
 @teams_namespace.param("team_id", "Team ID")
 class TeamPublicFails(Resource):
-    method_decorators = [require_team_mode]
+    method_decorators = [allow_hybrid_mode]
 
     @check_account_visibility
     @check_score_visibility
@@ -648,7 +665,7 @@ class TeamPublicFails(Resource):
 @teams_namespace.route("/<team_id>/awards")
 @teams_namespace.param("team_id", "Team ID")
 class TeamPublicAwards(Resource):
-    method_decorators = [require_team_mode]
+    method_decorators = [allow_hybrid_mode]
 
     @check_account_visibility
     @check_score_visibility

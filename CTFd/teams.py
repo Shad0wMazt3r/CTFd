@@ -170,6 +170,12 @@ def join():
 
             user = get_current_user()
             user.team_id = team.id
+            
+            # In hybrid mode, update user_type when joining team
+            from CTFd.utils import get_config
+            if get_config("user_mode") == "hybrid":
+                user.user_type = "team_member"
+            
             db.session.commit()
 
             if len(team.members) == 1:
@@ -325,6 +331,12 @@ def new():
         db.session.commit()
 
         user.team_id = team.id
+        
+        # In hybrid mode, update user_type when creating team
+        from CTFd.utils import get_config
+        if get_config("user_mode") == "hybrid":
+            user.user_type = "team_member"
+        
         db.session.commit()
 
         clear_user_session(user_id=user.id)

@@ -24,7 +24,23 @@ function toggleAccount() {
     hidden: hidden,
   };
 
-  api_func[CTFd.config.userMode](id, params).then((response) => {
+  // In hybrid mode, determine if this is a user or team based on the context
+  let apiFunction;
+  if (CTFd.config.userMode === 'hybrid') {
+    // Check if this element has a user-id data attribute (indicates individual user)
+    const userId = $btn.data("user-id");
+    if (userId) {
+      apiFunction = api_func.users;
+    } else {
+      // Otherwise, it's a team
+      apiFunction = api_func.teams;
+    }
+  } else {
+    // Standard mode - use the configured user mode
+    apiFunction = api_func[CTFd.config.userMode];
+  }
+
+  apiFunction(id, params).then((response) => {
     if (response.success) {
       if (hidden) {
         $btn.data("state", "hidden");
@@ -44,12 +60,26 @@ function toggleSelectedAccounts(selectedAccounts, action) {
     hidden: action === "hidden" ? true : false,
   };
   const reqs = [];
-  for (let accId of selectedAccounts.accounts) {
-    reqs.push(api_func[CTFd.config.userMode](accId, params));
+  
+  // Handle hybrid mode separately
+  if (CTFd.config.userMode === 'hybrid') {
+    // In hybrid mode, accounts can be either individual users or teams
+    for (let accId of selectedAccounts.accounts) {
+      reqs.push(api_func.teams(accId, params));  // Team accounts
+    }
+    for (let userId of selectedAccounts.users) {
+      reqs.push(api_func.users(userId, params));  // Individual user accounts
+    }
+  } else {
+    // Standard mode
+    for (let accId of selectedAccounts.accounts) {
+      reqs.push(api_func[CTFd.config.userMode](accId, params));
+    }
+    for (let accId of selectedAccounts.users) {
+      reqs.push(api_func["users"](accId, params));
+    }
   }
-  for (let accId of selectedAccounts.users) {
-    reqs.push(api_func["users"](accId, params));
-  }
+  
   Promise.all(reqs).then((_responses) => {
     window.location.reload();
   });
@@ -102,4 +132,15 @@ function bulkToggleAccounts(_event) {
 $(() => {
   $(".scoreboard-toggle").click(toggleAccount);
   $("#scoreboard-edit-button").click(bulkToggleAccounts);
+  
+  // Handle bulk selectors for hybrid mode tables
+  $("#individual-scoreboard-bulk-select").change(function() {
+    const isChecked = $(this).prop('checked');
+    $("#individual-scoreboard input[type=checkbox]").prop('checked', isChecked);
+  });
+  
+  $("#team-scoreboard-bulk-select").change(function() {
+    const isChecked = $(this).prop('checked');
+    $("#team-scoreboard input[type=checkbox]").prop('checked', isChecked);
+  });
 });

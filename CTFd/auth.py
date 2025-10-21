@@ -21,7 +21,7 @@ from CTFd.utils.decorators import ratelimit
 from CTFd.utils.decorators.visibility import check_registration_visibility
 from CTFd.utils.helpers import error_for, get_errors, markup
 from CTFd.utils.logging import log
-from CTFd.utils.modes import TEAMS_MODE
+from CTFd.utils.modes import TEAMS_MODE, HYBRID_MODE
 from CTFd.utils.security.auth import generate_preset_admin, login_user, logout_user
 from CTFd.utils.security.email import (
     remove_email_confirm_token,
@@ -413,7 +413,8 @@ def register():
         )
         db.session.close()
 
-        if is_teams_mode():
+        user_mode = get_config("user_mode")
+        if user_mode == TEAMS_MODE or (user_mode == HYBRID_MODE and user.team_id is None):
             return redirect(url_for("teams.private"))
 
         return redirect(url_for("challenges.listing"))

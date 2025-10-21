@@ -232,15 +232,62 @@ class BaseChallenge(object):
         :param request: The request the user submitted
         :return:
         """
+        from CTFd.utils import get_config
+        
         data = request.form or request.get_json()
         submission = data["submission"].strip()
-        solve = Solves(
-            user_id=user.id,
-            team_id=team.id if team else None,
-            challenge_id=challenge.id,
-            ip=get_ip(req=request),
-            provided=submission,
-        )
+        
+        user_mode = get_config("user_mode")
+        
+        # Handle solve attribution based on user mode
+        if user_mode == "hybrid":
+            # In hybrid mode, we need to be careful about unique constraints
+            if user.user_type == "individual":
+                # Individual users get user_id attribution only
+                solve = Solves(
+                    user_id=user.id,
+                    team_id=None,
+                    challenge_id=challenge.id,
+                    ip=get_ip(req=request),
+                    provided=submission,
+                )
+            elif user.user_type == "team_member" and team:
+                # Team members get team_id attribution only
+                solve = Solves(
+                    user_id=None,
+                    team_id=team.id,
+                    challenge_id=challenge.id,
+                    ip=get_ip(req=request),
+                    provided=submission,
+                )
+            else:
+                # Fallback - treat as individual
+                solve = Solves(
+                    user_id=user.id,
+                    team_id=None,
+                    challenge_id=challenge.id,
+                    ip=get_ip(req=request),
+                    provided=submission,
+                )
+        elif user_mode == "teams":
+            # In teams mode, attribute to team only
+            solve = Solves(
+                user_id=None,
+                team_id=team.id if team else None,
+                challenge_id=challenge.id,
+                ip=get_ip(req=request),
+                provided=submission,
+            )
+        else:
+            # In users mode, attribute to user only
+            solve = Solves(
+                user_id=user.id,
+                team_id=None,
+                challenge_id=challenge.id,
+                ip=get_ip(req=request),
+                provided=submission,
+            )
+        
         db.session.add(solve)
         db.session.commit()
 
@@ -258,15 +305,61 @@ class BaseChallenge(object):
         :param request: The request the user submitted
         :return:
         """
+        from CTFd.utils import get_config
+        
         data = request.form or request.get_json()
         submission = data["submission"].strip()
-        wrong = Fails(
-            user_id=user.id,
-            team_id=team.id if team else None,
-            challenge_id=challenge.id,
-            ip=get_ip(request),
-            provided=submission,
-        )
+        
+        user_mode = get_config("user_mode")
+        
+        # Handle fail attribution based on user mode (same logic as solve)
+        if user_mode == "hybrid":
+            if user.user_type == "individual":
+                # Individual users get user_id attribution only
+                wrong = Fails(
+                    user_id=user.id,
+                    team_id=None,
+                    challenge_id=challenge.id,
+                    ip=get_ip(request),
+                    provided=submission,
+                )
+            elif user.user_type == "team_member" and team:
+                # Team members get team_id attribution only
+                wrong = Fails(
+                    user_id=None,
+                    team_id=team.id,
+                    challenge_id=challenge.id,
+                    ip=get_ip(request),
+                    provided=submission,
+                )
+            else:
+                # Fallback - treat as individual
+                wrong = Fails(
+                    user_id=user.id,
+                    team_id=None,
+                    challenge_id=challenge.id,
+                    ip=get_ip(request),
+                    provided=submission,
+                )
+        elif user_mode == "teams":
+            # In teams mode, attribute to team only
+            wrong = Fails(
+                user_id=None,
+                team_id=team.id if team else None,
+                challenge_id=challenge.id,
+                ip=get_ip(request),
+                provided=submission,
+            )
+        else:
+            # In users mode, attribute to user only
+            wrong = Fails(
+                user_id=user.id,
+                team_id=None,
+                challenge_id=challenge.id,
+                ip=get_ip(request),
+                provided=submission,
+            )
+        
         db.session.add(wrong)
         db.session.commit()
 

@@ -5,7 +5,8 @@ from sqlalchemy.sql import and_
 from sqlalchemy.sql.expression import cast
 
 from CTFd.api.v1.statistics import statistics_namespace
-from CTFd.models import Challenges, Solves, db
+from CTFd.models import Challenges, Solves, Users, Teams, db
+from CTFd.utils import get_config
 from CTFd.utils.decorators import admins_only
 from CTFd.utils.modes import get_model
 
@@ -50,16 +51,52 @@ class ChallengeSolveStatistics(Resource):
         )
 
         Model = get_model()
+        user_mode = get_config("user_mode")
 
-        solves_sub = (
-            db.session.query(
-                Solves.challenge_id, db.func.count(Solves.challenge_id).label("solves")
+        if user_mode == "hybrid":
+            # For hybrid mode, union individual user solves and team solves
+            user_solves_sub = (
+                db.session.query(
+                    Solves.challenge_id, db.func.count(Solves.challenge_id).label("solves")
+                )
+                .join(Users, Solves.account_id == Users.id)
+                .filter(
+                    Users.banned == False, 
+                    Users.hidden == False,
+                    Users.user_type == "individual",
+                    Solves.user_id.isnot(None),
+                    Solves.team_id.is_(None),
+                )
+                .group_by(Solves.challenge_id)
             )
-            .join(Model, Solves.account_id == Model.id)
-            .filter(Model.banned == False, Model.hidden == False)
-            .group_by(Solves.challenge_id)
-            .subquery()
-        )
+            
+            team_solves_sub = (
+                db.session.query(
+                    Solves.challenge_id, db.func.count(Solves.challenge_id).label("solves")
+                )
+                .join(Teams, Solves.account_id == Teams.id)
+                .filter(
+                    Teams.banned == False, 
+                    Teams.hidden == False,
+                    Teams.user_type == "team",
+                    Solves.team_id.isnot(None),
+                    Solves.user_id.is_(None),
+                )
+                .group_by(Solves.challenge_id)
+            )
+            
+            solves_sub = user_solves_sub.union_all(team_solves_sub).subquery()
+        else:
+            # Standard mode (users or teams)
+            solves_sub = (
+                db.session.query(
+                    Solves.challenge_id, db.func.count(Solves.challenge_id).label("solves")
+                )
+                .join(Model, Solves.account_id == Model.id)
+                .filter(Model.banned == False, Model.hidden == False)
+                .group_by(Solves.challenge_id)
+                .subquery()
+            )
 
         solves = (
             db.session.query(
@@ -103,26 +140,91 @@ class ChallengeSolvePercentages(Resource):
         )
 
         Model = get_model()
+        user_mode = get_config("user_mode")
 
-        teams_with_points = (
-            db.session.query(Solves.account_id)
-            .join(Model)
-            .filter(Model.banned == False, Model.hidden == False)
-            .group_by(Solves.account_id)
-            .count()
-        )
+        if user_mode == "hybrid":
+            # For hybrid mode, count individual users and teams separately
+            individual_accounts_with_points = (
+                db.session.query(Solves.account_id)
+                .join(Users, Solves.account_id == Users.id)
+                .filter(
+                    Users.banned == False, 
+                    Users.hidden == False,
+                    Users.user_type == "individual",
+                    Solves.user_id.isnot(None),
+                    Solves.team_id.is_(None),
+                )
+                .group_by(Solves.account_id)
+                .count()
+            )
+            
+            team_accounts_with_points = (
+                db.session.query(Solves.account_id)
+                .join(Teams, Solves.account_id == Teams.id)
+                .filter(
+                    Teams.banned == False, 
+                    Teams.hidden == False,
+                    Teams.user_type == "team",
+                    Solves.team_id.isnot(None),
+                    Solves.user_id.is_(None),
+                )
+                .group_by(Solves.account_id)
+                .count()
+            )
+            
+            teams_with_points = individual_accounts_with_points + team_accounts_with_points
+        else:
+            # Standard mode (users or teams)
+            teams_with_points = (
+                db.session.query(Solves.account_id)
+                .join(Model)
+                .filter(Model.banned == False, Model.hidden == False)
+                .group_by(Solves.account_id)
+                .count()
+            )
 
         percentage_data = []
         for challenge in challenges:
-            solve_count = (
-                Solves.query.join(Model, Solves.account_id == Model.id)
-                .filter(
-                    Solves.challenge_id == challenge.id,
-                    Model.banned == False,
-                    Model.hidden == False,
+            if user_mode == "hybrid":
+                # For hybrid mode, count individual and team solves separately
+                individual_solve_count = (
+                    Solves.query.join(Users, Solves.account_id == Users.id)
+                    .filter(
+                        Solves.challenge_id == challenge.id,
+                        Users.banned == False,
+                        Users.hidden == False,
+                        Users.user_type == "individual",
+                        Solves.user_id.isnot(None),
+                        Solves.team_id.is_(None),
+                    )
+                    .count()
                 )
-                .count()
-            )
+                
+                team_solve_count = (
+                    Solves.query.join(Teams, Solves.account_id == Teams.id)
+                    .filter(
+                        Solves.challenge_id == challenge.id,
+                        Teams.banned == False,
+                        Teams.hidden == False,
+                        Teams.user_type == "team",
+                        Solves.team_id.isnot(None),
+                        Solves.user_id.is_(None),
+                    )
+                    .count()
+                )
+                
+                solve_count = individual_solve_count + team_solve_count
+            else:
+                # Standard mode (users or teams)
+                solve_count = (
+                    Solves.query.join(Model, Solves.account_id == Model.id)
+                    .filter(
+                        Solves.challenge_id == challenge.id,
+                        Model.banned == False,
+                        Model.hidden == False,
+                    )
+                    .count()
+                )
 
             if teams_with_points > 0:
                 percentage = float(solve_count) / float(teams_with_points)

@@ -5,7 +5,7 @@ from flask import current_app as app
 
 from CTFd.constants.themes import DEFAULT_THEME
 from CTFd.utils import get_app_config, get_config
-from CTFd.utils.modes import TEAMS_MODE, USERS_MODE
+from CTFd.utils.modes import TEAMS_MODE, USERS_MODE, HYBRID_MODE
 
 
 def ctf_name():
@@ -23,6 +23,10 @@ def is_users_mode():
 
 def is_teams_mode():
     return user_mode() == TEAMS_MODE
+
+
+def is_hybrid_mode():
+    return user_mode() == HYBRID_MODE
 
 
 def ctf_logo():

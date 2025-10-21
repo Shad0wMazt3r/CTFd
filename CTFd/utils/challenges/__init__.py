@@ -5,7 +5,7 @@ from sqlalchemy import func as sa_func
 from sqlalchemy.sql import and_, false, true
 
 from CTFd.cache import cache
-from CTFd.models import Challenges, Ratings, Solves, Submissions, Users, db
+from CTFd.models import Challenges, Ratings, Solves, Submissions, Users, Teams, db
 from CTFd.schemas.submissions import SubmissionSchema
 from CTFd.schemas.tags import TagSchema
 from CTFd.utils import get_config
@@ -122,25 +122,88 @@ def get_solve_counts_for_challenges(challenge_id=None, admin=False):
         challenge_id_filter = ()
     else:
         challenge_id_filter = (Solves.challenge_id == challenge_id,)
-    AccountModel = get_model()
+
+    user_mode = get_config("user_mode")
     freeze = get_config("freeze")
     if freeze and not admin:
         freeze_cond = Solves.date < unix_time_to_utc(freeze)
     else:
         freeze_cond = true()
-    exclude_solves_cond = and_(
-        AccountModel.banned == false(),
-        AccountModel.hidden == false(),
-    )
-    solves_q = (
-        db.session.query(
-            Solves.challenge_id,
-            sa_func.count(Solves.challenge_id),
+
+    if user_mode == "users":
+        AccountModel = Users
+        exclude_solves_cond = and_(
+            AccountModel.banned == false(),
+            AccountModel.hidden == false(),
         )
-        .join(AccountModel)
-        .filter(*challenge_id_filter, freeze_cond, exclude_solves_cond)
-        .group_by(Solves.challenge_id)
-    )
+        solves_q = (
+            db.session.query(
+                Solves.challenge_id,
+                sa_func.count(Solves.challenge_id),
+            )
+            .join(AccountModel)
+            .filter(*challenge_id_filter, freeze_cond, exclude_solves_cond)
+            .group_by(Solves.challenge_id)
+        )
+    elif user_mode == "teams":
+        AccountModel = Teams
+        exclude_solves_cond = and_(
+            AccountModel.banned == false(),
+            AccountModel.hidden == false(),
+        )
+        solves_q = (
+            db.session.query(
+                Solves.challenge_id,
+                sa_func.count(Solves.challenge_id),
+            )
+            .join(AccountModel)
+            .filter(*challenge_id_filter, freeze_cond, exclude_solves_cond)
+            .group_by(Solves.challenge_id)
+        )
+    elif user_mode == "hybrid":
+        # Query for users
+        user_solves_q = (
+            db.session.query(
+                Solves.challenge_id,
+                sa_func.count(Solves.challenge_id),
+            )
+            .join(Users, Solves.account_id == Users.id)
+            .filter(
+                *challenge_id_filter,
+                freeze_cond,
+                Users.banned == false(),
+                Users.hidden == false(),
+                Users.user_type == "individual",  # Only count individual users
+                Solves.user_id.isnot(None),      # Only individual user solves
+                Solves.team_id.is_(None),
+            )
+            .group_by(Solves.challenge_id)
+        )
+
+        # Query for teams
+        team_solves_q = (
+            db.session.query(
+                Solves.challenge_id,
+                sa_func.count(Solves.challenge_id),
+            )
+            .join(Teams, Solves.account_id == Teams.id)
+            .filter(
+                *challenge_id_filter,
+                freeze_cond,
+                Teams.banned == false(),
+                Teams.hidden == false(),
+                Teams.user_type == "team",        # Only count teams
+                Solves.team_id.isnot(None),      # Only team solves
+                Solves.user_id.is_(None),
+            )
+            .group_by(Solves.challenge_id)
+        )
+        # Union both queries
+        solves_q = user_solves_q.union_all(team_solves_q)
+    else:
+        # Fallback for unknown user_mode, though it should not happen
+        solves_q = db.session.query() # Empty query to prevent errors
+
 
     solve_counts = {}
     for chal_id, solve_count in solves_q:

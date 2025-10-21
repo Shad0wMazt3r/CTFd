@@ -18,6 +18,7 @@ from CTFd.constants.config import (
     ChallengeVisibilityTypes,
     RegistrationVisibilityTypes,
     ScoreVisibilityTypes,
+    UserModeTypes,
 )
 from CTFd.constants.themes import DEFAULT_THEME
 from CTFd.forms import BaseForm
@@ -34,10 +35,14 @@ class SetupForm(BaseForm):
     )
     user_mode = RadioField(
         _l("User Mode"),
-        choices=[("teams", _l("Team Mode")), ("users", _l("User Mode"))],
-        default="teams",
+        choices=[
+            (UserModeTypes.TEAMS, _l("Team Mode")),
+            (UserModeTypes.USERS, _l("User Mode")),
+            (UserModeTypes.HYBRID, _l("Hybrid Mode"))
+        ],
+        default=UserModeTypes.TEAMS,
         description=_l(
-            "Controls whether users join together in teams to play (Team Mode) or play as themselves (User Mode)"
+            "Controls whether users join together in teams to play (Team Mode), play as themselves (User Mode), or both (Hybrid Mode)"
         ),
         validators=[InputRequired()],
     )

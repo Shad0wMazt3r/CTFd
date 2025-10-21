@@ -12,6 +12,7 @@ class ConfigTypes(str, RawEnum):
 class UserModeTypes(str, RawEnum):
     USERS = "users"
     TEAMS = "teams"
+    HYBRID = "hybrid"
 
 
 @JinjaEnum

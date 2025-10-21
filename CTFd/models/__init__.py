@@ -261,6 +261,22 @@ class Awards(db.Model):
             return self.team_id
         elif user_mode == "users":
             return self.user_id
+        elif user_mode == "hybrid":
+            # In hybrid mode, return whichever ID is set (one should be None)
+            return self.team_id if self.team_id is not None else self.user_id
+
+    @hybrid_property
+    def account(self):
+        from CTFd.utils import get_config
+
+        user_mode = get_config("user_mode")
+        if user_mode == "teams":
+            return self.team
+        elif user_mode == "users":
+            return self.user
+        elif user_mode == "hybrid":
+            # In hybrid mode, return whichever account is set (one should be None)
+            return self.team if self.team_id is not None else self.user
 
     def __init__(self, *args, **kwargs):
         super(Awards, self).__init__(**kwargs)
@@ -418,6 +434,9 @@ class Users(db.Model):
     # Relationship for Teams
     team_id = db.Column(db.Integer, db.ForeignKey("teams.id"))
 
+    # User type for hybrid mode: 'individual' or 'team_member'
+    user_type = db.Column(db.String(20), nullable=False, default='individual')
+
     # Relationship for Brackets
     bracket = db.relationship("Brackets", foreign_keys=[bracket_id], lazy="joined")
 
@@ -450,6 +469,12 @@ class Users(db.Model):
             return self.team_id
         elif user_mode == "users":
             return self.id
+        elif user_mode == "hybrid":
+            # In hybrid mode, return user.id for individuals, team_id for team members
+            if self.user_type == "individual":
+                return self.id
+            elif self.user_type == "team_member":
+                return self.team_id
 
     @hybrid_property
     def account(self):
@@ -644,6 +669,9 @@ class Teams(db.Model):
     # Relationship for Users
     captain_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"))
     captain = db.relationship("Users", foreign_keys=[captain_id])
+
+    # User type for hybrid mode: 'team'
+    user_type = db.Column(db.String(20), nullable=False, default='team')
 
     # Relationship for Brackets
     bracket = db.relationship("Brackets", foreign_keys=[bracket_id], lazy="joined")
@@ -899,6 +927,9 @@ class Submissions(db.Model):
             return self.team_id
         elif user_mode == "users":
             return self.user_id
+        elif user_mode == "hybrid":
+            # In hybrid mode, return whichever ID is set (one should be None)
+            return self.team_id if self.team_id is not None else self.user_id
 
     @hybrid_property
     def account(self):
@@ -909,6 +940,9 @@ class Submissions(db.Model):
             return self.team
         elif user_mode == "users":
             return self.user
+        elif user_mode == "hybrid":
+            # In hybrid mode, return whichever account is set (one should be None)
+            return self.team if self.team_id is not None else self.user
 
     @staticmethod
     def get_child(type):
