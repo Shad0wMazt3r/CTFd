@@ -14,7 +14,11 @@
 			<div class="col-md-6 offset-md-3 text-center">
 				<p>Welcome to {{ Configs.ctf_name }}!</p>
 				<p>
-					In order to participate you must either join or create a team.
+					{% if config.user_mode() == "hybrid" %}
+						You can join or create a team, or participate as an individual.
+					{% else %}
+						In order to participate you must either join or create a team.
+					{% endif %}
 				</p>
 			</div>
 		</div>
@@ -30,6 +34,20 @@
 			</div>
 			<div class="col-md-3 text-center">
 				<a class="btn btn-light w-100" href="{{ url_for('teams.new') }}">Create Unofficial Team</a>
+			</div>
+		</div>
+		{% elif config.user_mode() == "hybrid" %}
+		<div class="row pt-3">
+			<div class="col-md-3 offset-md-3 text-center">
+				<a class="btn btn-primary w-100" href="{{ url_for('teams.join') }}">Join Team</a>
+			</div>
+			<div class="col-md-3 text-center">
+				<a class="btn btn-primary w-100" href="{{ url_for('teams.new') }}">Create Team</a>
+			</div>
+		</div>
+		<div class="row pt-3">
+			<div class="col-md-4 offset-md-4 text-center">
+				<a class="btn btn-success w-100" href="{{ url_for('teams.go_solo') }}">Go Solo</a>
 			</div>
 		</div>
 		{% else %}

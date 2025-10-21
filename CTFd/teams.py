@@ -6,7 +6,7 @@ from CTFd.models import Brackets, TeamFieldEntries, TeamFields, Teams, db
 from CTFd.utils import config, get_config, validators
 from CTFd.utils.crypto import verify_password
 from CTFd.utils.decorators import authed_only, ratelimit, registered_only
-from CTFd.utils.decorators.modes import require_team_mode
+from CTFd.utils.decorators.modes import require_team_mode, allow_hybrid_mode
 from CTFd.utils.decorators.visibility import (
     check_account_visibility,
     check_score_visibility,
@@ -413,3 +413,23 @@ def public(team_id):
         infos=infos,
         errors=errors,
     )
+
+
+@teams.route("/go_solo")
+@authed_only
+@allow_hybrid_mode
+def go_solo():
+    """Set user as individual participant in hybrid mode"""
+    from CTFd.utils.user import get_current_user
+    
+    user = get_current_user()
+    
+    # Set user as individual
+    user.user_type = "individual"
+    user.team_id = None
+    db.session.commit()
+    
+    # Clear any team session data
+    clear_user_session(user_id=user.id)
+    
+    return redirect(url_for("challenges.listing"))

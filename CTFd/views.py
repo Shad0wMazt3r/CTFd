@@ -38,7 +38,7 @@ from CTFd.models import (
 from CTFd.utils import config, get_config, set_config
 from CTFd.utils import user as current_user
 from CTFd.utils import validators
-from CTFd.utils.config import can_send_mail, is_setup, is_teams_mode
+from CTFd.utils.config import can_send_mail, is_setup, is_teams_mode, is_hybrid_mode
 from CTFd.utils.config.pages import build_markdown, get_page
 from CTFd.utils.config.visibility import challenges_visible
 from CTFd.utils.dates import ctf_ended, ctftime, view_after_ctf
@@ -315,6 +315,14 @@ def settings():
         infos.append(
             markup(
                 f'In order to participate you must either <a href="{team_url}">join or create a team</a>.'
+            )
+        )
+    
+    if is_hybrid_mode() and get_current_team() is None and user.user_type != "individual":
+        team_url = url_for("teams.private")
+        infos.append(
+            markup(
+                f'You can <a href="{team_url}">join or create a team</a>, or continue as an individual participant.'
             )
         )
 
