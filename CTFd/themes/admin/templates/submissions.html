@@ -84,6 +84,9 @@
 						{% if mode == UserModeTypes.TEAMS %}
 						<th class="sort-col"><b>User</b></th>
 						{% endif %}
+						{% if mode == UserModeTypes.HYBRID %}
+						<th class="sort-col"><b>Type</b></th>
+						{% endif %}
 						<th class="sort-col"><b>{{ get_mode_as_word(capitalize=True) }}</b></th>
 						<th class="sort-col"><b>Challenge</b></th>
 						<th class="sort-col"><b>Type</b></th>
@@ -109,10 +112,31 @@
 							</a>
 						</td>
 						{% endif %}
+						{% if mode == UserModeTypes.HYBRID %}
+						<td>
+							{% if sub.team_id %}
+								Team
+							{% else %}
+								Individual
+							{% endif %}
+						</td>
+						{% endif %}
 						<td class="team" id="{{ sub.account_id }}">
-							<a href="{{ generate_account_url(sub.account_id, admin=True) }}">
-								{{ sub.account.name }}
-							</a>
+							{% if mode == UserModeTypes.HYBRID %}
+								{% if sub.team_id %}
+									<a href="{{ url_for('admin.teams_detail', team_id=sub.team_id) }}">
+										{{ sub.team.name if sub.team else 'Unknown Team' }}
+									</a>
+								{% else %}
+									<a href="{{ url_for('admin.users_detail', user_id=sub.user_id) }}">
+										{{ sub.user.name if sub.user else 'Unknown User' }}
+									</a>
+								{% endif %}
+							{% else %}
+								<a href="{{ generate_account_url(sub.account_id, admin=True) }}">
+									{{ sub.account.name }}
+								</a>
+							{% endif %}
 						</td>
 						<td class="chal" id="{{ sub.challenge_id }}">
 							<a href="{{ url_for('admin.challenges_detail', challenge_id=sub.challenge_id) }}">
